@@ -1,0 +1,510 @@
+dataContractSpecification: "1.1.0"
+
+id: "material-plant-data-quality-source-contract"
+name: "Material Plant Data Quality Source Contract"
+version: "1.0.0"
+status: "active"
+
+description: >
+  Pre-transformation data contract for the Material Plant Data Quality Check data product.
+  This contract validates that all source tables and fields required by the transformation
+  SQL exist and conform to expected source formatting rules before the transformation is executed.
+
+owner:
+  name: "Data Excellence Practice EMEA"
+  role: "Data Product Owner"
+
+execution:
+  validationStage: "pre-transformation"
+  failureAction: "stop_pipeline"
+  successAction: "run_material_plant_data_quality_transformation"
+  targetDataProduct: "default.MATERIAL_PLANT_DATA_QUALITY_CHECK"
+
+servers:
+  source:
+    type: "databricks"
+    environment: "production"
+    catalog: "workspace"
+    schemas:
+      - "sap_bronze"
+      - "default"
+
+dataProduct:
+  name: "Material Plant Data Quality Check"
+  targetTable: "default.MATERIAL_PLANT_DATA_QUALITY_CHECK"
+  sourceSystem: "SAP"
+  domain: "Material Master Data"
+  subjectArea: "Material Plant Data Quality"
+
+models:
+
+  marc:
+    description: "SAP Material Master - Plant Data"
+    type: "table"
+    physicalName: "workspace.sap_bronze.marc"
+    required: true
+
+    fields:
+
+      mandt:
+        sourceField: "MANDT"
+        description: "SAP Client"
+        required: true
+        nullable: false
+        type: "string"
+        format:
+          length: 3
+          regex: "^[0-9]{3}$"
+
+      werks:
+        sourceField: "WERKS"
+        description: "Plant"
+        required: true
+        nullable: false
+        type: "string"
+        format:
+          maxLength: 4
+          regex: "^[A-Z0-9]{1,4}$"
+
+      matnr:
+        sourceField: "MATNR"
+        description: "Material Number"
+        required: true
+        nullable: false
+        type: "string"
+        format:
+          maxLength: 40
+          regex: "^[A-Z0-9_\\-]+$"
+
+      dispo:
+        sourceField: "DISPO"
+        description: "MRP Controller"
+        required: true
+        nullable: true
+        type: "string"
+        format:
+          maxLength: 3
+
+      beskz:
+        sourceField: "BESKZ"
+        description: "Procurement Type"
+        required: true
+        nullable: true
+        type: "string"
+        format:
+          maxLength: 1
+        allowedValues:
+          - "E"
+          - "F"
+          - "X"
+
+      ekgrp:
+        sourceField: "EKGRP"
+        description: "Purchasing Group"
+        required: true
+        nullable: true
+        type: "string"
+        format:
+          maxLength: 3
+
+      shflg:
+        sourceField: "SHFLG"
+        description: "Safety Time Indicator"
+        required: true
+        nullable: true
+        type: "string"
+        format:
+          maxLength: 1
+
+      shzet:
+        sourceField: "SHZET"
+        description: "Safety Time"
+        required: true
+        nullable: true
+        type: "numeric_string"
+        format:
+          castableTo: "double"
+
+      dzeit:
+        sourceField: "DZEIT"
+        description: "In-house Production Time"
+        required: true
+        nullable: true
+        type: "numeric_string"
+        format:
+          castableTo: "double"
+
+      kordb:
+        sourceField: "KORDB"
+        description: "Source List Requirement Indicator"
+        required: true
+        nullable: true
+        type: "string"
+        format:
+          maxLength: 1
+        allowedValues:
+          - "X"
+
+      eislo:
+        sourceField: "EISLO"
+        description: "Minimum Safety Stock"
+        required: true
+        nullable: true
+        type: "numeric_string"
+        format:
+          castableTo: "double"
+
+      disls:
+        sourceField: "DISLS"
+        description: "Lot Sizing Procedure"
+        required: true
+        nullable: true
+        type: "string"
+        format:
+          maxLength: 2
+
+      dismm:
+        sourceField: "DISMM"
+        description: "MRP Type"
+        required: true
+        nullable: true
+        type: "string"
+        format:
+          maxLength: 2
+
+      webaz:
+        sourceField: "WEBAZ"
+        description: "Goods Receipt Processing Time"
+        required: true
+        nullable: true
+        type: "numeric_string"
+        format:
+          castableTo: "double"
+
+      eisbe:
+        sourceField: "EISBE"
+        description: "Safety Stock"
+        required: true
+        nullable: true
+        type: "numeric_string"
+        format:
+          castableTo: "double"
+
+      mtvfp:
+        sourceField: "MTVFP"
+        description: "Checking Group for Availability Check"
+        required: true
+        nullable: true
+        type: "string"
+        format:
+          maxLength: 2
+
+      fevor:
+        sourceField: "FEVOR"
+        description: "Production Scheduler"
+        required: true
+        nullable: true
+        type: "string"
+        format:
+          maxLength: 3
+
+      plifz:
+        sourceField: "PLIFZ"
+        description: "Planned Delivery Time"
+        required: true
+        nullable: true
+        type: "numeric_string"
+        format:
+          castableTo: "double"
+
+      prctr:
+        sourceField: "PRCTR"
+        description: "Profit Center"
+        required: true
+        nullable: true
+        type: "string"
+        format:
+          maxLength: 10
+
+      maabc:
+        sourceField: "MAABC"
+        description: "ABC Indicator"
+        required: true
+        nullable: true
+        type: "string"
+        format:
+          maxLength: 1
+
+      lvorm:
+        sourceField: "LVORM"
+        description: "Deletion Indicator"
+        required: true
+        nullable: true
+        type: "string"
+        format:
+          maxLength: 1
+        allowedValues:
+          - "X"
+
+  mara:
+    description: "SAP Material Master - General Material Data"
+    type: "table"
+    physicalName: "workspace.sap_bronze.mara"
+    required: true
+
+    fields:
+
+      mandt:
+        sourceField: "MANDT"
+        description: "SAP Client"
+        required: true
+        nullable: false
+        type: "string"
+        format:
+          length: 3
+          regex: "^[0-9]{3}$"
+
+      matnr:
+        sourceField: "MATNR"
+        description: "Material Number"
+        required: true
+        nullable: false
+        type: "string"
+        format:
+          maxLength: 40
+          regex: "^[A-Z0-9_\\-]+$"
+
+      mtart:
+        sourceField: "MTART"
+        description: "Material Type"
+        required: true
+        nullable: true
+        type: "string"
+        format:
+          maxLength: 4
+        expectedValuesUsedInLogic:
+          - "FERT"
+          - "HALB"
+          - "HAWA"
+
+  ekpo:
+    description: "SAP Purchasing Document Item"
+    type: "table"
+    physicalName: "workspace.sap_bronze.ekpo"
+    required: true
+
+    fields:
+
+      matnr:
+        sourceField: "MATNR"
+        description: "Material Number"
+        required: true
+        nullable: true
+        type: "string"
+        format:
+          maxLength: 40
+          regex: "^[A-Z0-9_\\-]+$"
+
+      aedat:
+        sourceField: "AEDAT"
+        description: "Purchase Order Item Change or Creation Date"
+        required: true
+        nullable: true
+        type: "date_string"
+        format:
+          castableTo: "date"
+          expectedPatterns:
+            - "yyyy-MM-dd"
+            - "yyyyMMdd"
+
+  vbap:
+    description: "SAP Sales Document Item"
+    type: "table"
+    physicalName: "workspace.sap_bronze.vbap"
+    required: true
+
+    fields:
+
+      matnr:
+        sourceField: "MATNR"
+        description: "Material Number"
+        required: true
+        nullable: true
+        type: "string"
+        format:
+          maxLength: 40
+          regex: "^[A-Z0-9_\\-]+$"
+
+      erdat:
+        sourceField: "ERDAT"
+        description: "Sales Document Creation Date"
+        required: true
+        nullable: true
+        type: "date_string"
+        format:
+          castableTo: "date"
+          expectedPatterns:
+            - "yyyy-MM-dd"
+            - "yyyyMMdd"
+
+  dq_rules_master:
+    description: "Data Quality Rules Master"
+    type: "table"
+    physicalName: "workspace.default.dq_rules_master"
+    required: true
+
+    fields:
+
+      rule_name:
+        sourceField: "RULE_NAME"
+        description: "Data Quality Rule Name"
+        required: true
+        nullable: false
+        type: "string"
+
+      function:
+        sourceField: "FUNCTION"
+        description: "Data Quality Rule Function"
+        required: true
+        nullable: true
+        type: "string"
+
+      type:
+        sourceField: "TYPE"
+        description: "Data Quality Rule Type"
+        required: true
+        nullable: true
+        type: "string"
+
+relationships:
+
+  - name: "marc_to_mara_material_master"
+    description: "MARC plant data joins to MARA general material data"
+    required: true
+    sourceModel: "marc"
+    targetModel: "mara"
+    relationshipType: "many-to-one"
+    joinFields:
+      - sourceField: "MANDT"
+        targetField: "MANDT"
+      - sourceField: "MATNR"
+        targetField: "MATNR"
+
+  - name: "dq_output_to_dq_rules_master"
+    description: "Generated data quality rule name joins to the DQ rules master"
+    required: true
+    sourceModel: "generated_data_quality_output"
+    targetModel: "dq_rules_master"
+    relationshipType: "many-to-one"
+    joinFields:
+      - sourceField: "DATA_QUALITY_RULE_NAME"
+        targetField: "RULE_NAME"
+
+validationRules:
+
+  tableExistence:
+
+    - ruleId: "TABLE_EXISTS_MARC"
+      ruleType: "table_exists"
+      severity: "error"
+      table: "workspace.sap_bronze.marc"
+
+    - ruleId: "TABLE_EXISTS_MARA"
+      ruleType: "table_exists"
+      severity: "error"
+      table: "workspace.sap_bronze.mara"
+
+    - ruleId: "TABLE_EXISTS_EKPO"
+      ruleType: "table_exists"
+      severity: "error"
+      table: "workspace.sap_bronze.ekpo"
+
+    - ruleId: "TABLE_EXISTS_VBAP"
+      ruleType: "table_exists"
+      severity: "error"
+      table: "workspace.sap_bronze.vbap"
+
+    - ruleId: "TABLE_EXISTS_DQ_RULES_MASTER"
+      ruleType: "table_exists"
+      severity: "error"
+      table: "workspace.default.dq_rules_master"
+
+  fieldExistence:
+
+    - ruleId: "FIELDS_EXIST_MARC"
+      ruleType: "fields_exist"
+      severity: "error"
+      table: "workspace.sap_bronze.marc"
+      requiredFields:
+        - "MANDT"
+        - "WERKS"
+        - "MATNR"
+        - "DISPO"
+        - "BESKZ"
+        - "EKGRP"
+        - "SHFLG"
+        - "SHZET"
+        - "DZEIT"
+        - "KORDB"
+        - "EISLO"
+        - "DISLS"
+        - "DISMM"
+        - "WEBAZ"
+        - "EISBE"
+        - "MTVFP"
+        - "FEVOR"
+        - "PLIFZ"
+        - "PRCTR"
+        - "MAABC"
+        - "LVORM"
+
+    - ruleId: "FIELDS_EXIST_MARA"
+      ruleType: "fields_exist"
+      severity: "error"
+      table: "workspace.sap_bronze.mara"
+      requiredFields:
+        - "MANDT"
+        - "MATNR"
+        - "MTART"
+
+    - ruleId: "FIELDS_EXIST_EKPO"
+      ruleType: "fields_exist"
+      severity: "error"
+      table: "workspace.sap_bronze.ekpo"
+      requiredFields:
+        - "MATNR"
+        - "AEDAT"
+
+    - ruleId: "FIELDS_EXIST_VBAP"
+      ruleType: "fields_exist"
+      severity: "error"
+      table: "workspace.sap_bronze.vbap"
+      requiredFields:
+        - "MATNR"
+        - "ERDAT"
+
+    - ruleId: "FIELDS_EXIST_DQ_RULES_MASTER"
+      ruleType: "fields_exist"
+      severity: "error"
+      table: "workspace.default.dq_rules_master"
+      requiredFields:
+        - "RULE_NAME"
+        - "FUNCTION"
+        - "TYPE"
+
+  formatValidation:
+
+    - ruleId: "FORMAT_MARC_MANDT"
+      ruleType: "field_format"
+      severity: "error"
+      table: "workspace.sap_bronze.marc"
+      field: "MANDT"
+      regex: "^[0-9]{3}$"
+
+    - ruleId: "FORMAT_MARA_MANDT"
+      ruleType: "field_format"
+      severity: "error"
+      table: "workspace.sap_bronze.mara"
+      field: "MANDT"
+      regex: "^[0-9]{3}$"
+
