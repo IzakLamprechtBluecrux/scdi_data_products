@@ -1,25 +1,12 @@
 """
-Generic YAML Data Contract Validator for Databricks / PySpark
+Generic YAML Data Contract Validator for Databricks / PySpark.
 
 Location:
-    scdi_data_products/contract_validator_generic/generic_data_contract_validator.py
+    scdi_data_products/contract_validator_generic/data_contract_validator.py
 
 Purpose:
     Reusable validation engine that reads a YAML data contract and validates
     source tables and fields before transformation logic runs.
-
-Supported validations:
-    - Table existence
-    - Field existence
-    - Nullability
-    - Regex checks
-    - Exact length checks
-    - Max length checks
-    - Allowed values
-    - Castability checks
-    - Required reference values
-    - Delta results logging
-    - Pipeline failure on blocking errors
 """
 
 from datetime import datetime
@@ -32,40 +19,23 @@ except ImportError as exc:
         "PyYAML is required. In Databricks, install it with: %pip install pyyaml"
     ) from exc
 
-from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.types import (
-    StructType,
-    StructField,
-    StringType,
-    LongType,
-)
+from pyspark.sql.types import LongType, StringType, StructField, StructType
 
 
 def load_yaml_contract(contract_file_path: str) -> Dict[str, Any]:
-    """
-    Load a YAML data contract from a local, Databricks repo, workspace, or mounted path.
-    """
-    with open(contract_file_path, "r") as file:
-        return yaml.safe_load(file)
+    with open(contract_file_path, "r", encoding="utf-8") as file:
+        contract = yaml.safe_load(file)
+
+    return contract or {}
 
 
 def normalise_path(path: str) -> str:
-    """
-    Normalise Databricks paths.
-
-    Example:
-        dbfs:/FileStore/contracts/file.yml
-        becomes:
-        /dbfs/FileStore/contracts/file.yml
-    """
     return path.replace("dbfs:/", "/dbfs/")
 
 
 def safe_rule_id(*parts: Any) -> str:
-    """
-    Create a clean, consistent rule ID from multiple values.
-    """
     return "_".join(
         str(part)
         .replace(".", "_")
@@ -79,18 +49,11 @@ def safe_rule_id(*parts: Any) -> str:
 
 
 def quote_col(column_name: str) -> str:
-    """
-    Safely quote a Spark SQL column name.
-    """
     escaped = column_name.replace("`", "``")
     return f"`{escaped}`"
 
 
 class GenericDataContractValidator:
-    """
-    Generic YAML-driven data contract validator for Databricks / PySpark.
-    """
-
     def __init__(
         self,
         spark: SparkSession,
@@ -98,7 +61,7 @@ class GenericDataContractValidator:
         validation_results_table: str = "workspace.default.data_contract_validation_results",
         fail_on_warning: bool = False,
         write_results: bool = True,
-    ):
+    ) -> None:
         self.spark = spark
         self.contract_file_path = normalise_path(contract_file_path)
         self.validation_results_table = validation_results_table
@@ -109,15 +72,12 @@ class GenericDataContractValidator:
 
         self.contract_id = self.contract.get("id", "unknown_contract")
         self.contract_version = str(self.contract.get("version", "unknown_version"))
-
-        self.target_data_product = (
-            self.contract
-            .get("execution", {})
-            .get("targetDataProduct", "unknown_target_data_product")
+        self.target_data_product = self.contract.get("execution", {}).get(
+            "targetDataProduct",
+            "unknown_target_data_product",
         )
 
         self.validation_results: List[Dict[str, Any]] = []
-
         self._table_exists_cache: Dict[str, bool] = {}
         self._table_columns_cache: Dict[str, List[str]] = {}
         self._actual_column_cache: Dict[str, str] = {}
@@ -133,9 +93,6 @@ class GenericDataContractValidator:
         message: Optional[str] = None,
         failed_count: Optional[int] = None,
     ) -> None:
-        """
-        Add a single validation result record.
-        """
         self.validation_results.append(
             {
                 "contract_id": self.contract_id,
@@ -155,9 +112,6 @@ class GenericDataContractValidator:
         )
 
     def create_empty_results_df(self) -> DataFrame:
-        """
-        Create an empty validation result DataFrame.
-        """
         schema = StructType(
             [
                 StructField("contract_id", StringType(), True),
@@ -179,9 +133,6 @@ class GenericDataContractValidator:
         return self.spark.createDataFrame([], schema)
 
     def table_exists(self, table_name: str) -> bool:
-        """
-        Check whether a Spark table exists and is accessible.
-        """
         if table_name in self._table_exists_cache:
             return self._table_exists_cache[table_name]
 
@@ -195,9 +146,6 @@ class GenericDataContractValidator:
         return exists
 
     def get_table_columns(self, table_name: str) -> List[str]:
-        """
-        Return the uppercase column names for a table.
-        """
         if table_name in self._table_columns_cache:
             return self._table_columns_cache[table_name]
 
@@ -213,9 +161,6 @@ class GenericDataContractValidator:
         return columns
 
     def get_actual_column_name(self, table_name: str, expected_column: str) -> str:
-        """
-        Return the case-sensitive column name from the table schema.
-        """
         cache_key = f"{table_name}.{expected_column.upper()}"
 
         if cache_key in self._actual_column_cache:
@@ -232,15 +177,9 @@ class GenericDataContractValidator:
         return expected_column
 
     def field_exists(self, table_name: str, field_name: str) -> bool:
-        """
-        Check whether a field exists in a table.
-        """
         return field_name.upper() in self.get_table_columns(table_name)
 
     def validate_contract_definition(self) -> None:
-        """
-        Validate that the YAML contract has the minimum required structure.
-        """
         if not self.contract_id or self.contract_id == "unknown_contract":
             self.add_result(
                 rule_id="CONTRACT_ID_MISSING",
@@ -260,12 +199,7 @@ class GenericDataContractValidator:
             )
 
     def validate_table_existence(self) -> None:
-        """
-        Validate that every required source table exists.
-        """
-        models = self.contract.get("models", {})
-
-        for model_name, model_config in models.items():
+        for model_name, model_config in self.contract.get("models", {}).items():
             table_name = model_config.get("physicalName")
             required = model_config.get("required", True)
             severity = "error" if required else "warning"
@@ -296,12 +230,7 @@ class GenericDataContractValidator:
             )
 
     def validate_field_existence(self) -> None:
-        """
-        Validate that every required field exists in each source table.
-        """
-        models = self.contract.get("models", {})
-
-        for model_name, model_config in models.items():
+        for model_name, model_config in self.contract.get("models", {}).items():
             table_name = model_config.get("physicalName")
             fields = model_config.get("fields", {})
 
@@ -329,12 +258,7 @@ class GenericDataContractValidator:
                 )
 
     def validate_nullability(self) -> None:
-        """
-        Validate not-null constraints.
-        """
-        models = self.contract.get("models", {})
-
-        for model_name, model_config in models.items():
+        for model_name, model_config in self.contract.get("models", {}).items():
             table_name = model_config.get("physicalName")
             fields = model_config.get("fields", {})
 
@@ -355,12 +279,11 @@ class GenericDataContractValidator:
                 df = self.spark.table(table_name)
 
                 failed_count = df.filter(F.col(actual_col).isNull()).count()
-                status = "passed" if failed_count == 0 else "failed"
 
                 self.add_result(
                     rule_id=safe_rule_id("NOT_NULL", model_name, source_field),
                     rule_type="not_null",
-                    status=status,
+                    status="passed" if failed_count == 0 else "failed",
                     severity="error",
                     table_name=table_name,
                     field_name=source_field,
@@ -371,13 +294,8 @@ class GenericDataContractValidator:
                     ),
                 )
 
-    def validate_regex(self) -> None:
-        """
-        Validate regex format checks defined in the YAML contract.
-        """
-        models = self.contract.get("models", {})
-
-        for model_name, model_config in models.items():
+    def validate_regex
+        for model_name, model_config in self.contract.get("models", {}).items():
             table_name = model_config.get("physicalName")
             fields = model_config.get("fields", {})
 
@@ -396,28 +314,21 @@ class GenericDataContractValidator:
                     continue
 
                 actual_col = self.get_actual_column_name(table_name, source_field)
-
                 severity = field_config.get(
                     "severity",
                     format_config.get("severity", "error"),
                 )
-
                 df = self.spark.table(table_name)
 
-                failed_count = (
-                    df
-                    .filter           F.col(actual_col).isNotNull()
-                        & (~F.col(actual_col).cast("string").rlike(regex))
-                    )
-                    .count()
-                )
-
-                status = "passed" if failed_count == 0 else "failed"
+                failed_count = df.filter(
+                    F.col(actual_col).isNotNull()
+                    & (~F.col(actual_col).cast("string").rlike(regex))
+                ).count()
 
                 self.add_result(
                     rule_id=safe_rule_id("REGEX", model_name, source_field),
                     rule_type="regex",
-                    status=status,
+                    status="passed" if failed_count == 0 else "failed",
                     severity=severity,
                     table_name=table_name,
                     field_name=source_field,
@@ -429,12 +340,7 @@ class GenericDataContractValidator:
                 )
 
     def validate_length(self) -> None:
-        """
-        Validate exact length and maximum length rules.
-        """
-        models = self.contract.get("models", {})
-
-        for model_name, model_config in models.items():
+        for model_name, model_config in self.contract.get("models", {}).items():
             table_name = model_config.get("physicalName")
             fields = model_config.get("fields", {})
 
@@ -455,28 +361,20 @@ class GenericDataContractValidator:
                     continue
 
                 actual_col = self.get_actual_column_name(table_name, source_field)
-
                 severity = field_config.get(
                     "severity",
                     format_config.get("severity", "error"),
                 )
-
                 df = self.spark.table(table_name)
 
                 if exact_length is not None:
-                    failed_count = (
-                        df
-                        .filter(
-                            F.col(actual_col).isNotNull()
-                            & (
-                                F.length(F.col(actual_col).cast("string"))
-                                != int(exact_length)
-                            )
+                    failed_count = df.filter(
+                        F.col(actual_col).isNotNull()
+                        & (
+                            F.length(F.col(actual_col).cast("string"))
+                            != int(exact_length)
                         )
-                        .count()
-                    )
-
-                    status = "passed" if failed_count == 0 else "failed"
+                    ).count()
 
                     self.add_result(
                         rule_id=safe_rule_id(
@@ -485,7 +383,7 @@ class GenericDataContractValidator:
                             source_field,
                         ),
                         rule_type="exact_length",
-                        status=status,
+                        status="passed" if failed_count == 0 else "failed",
                         severity=severity,
                         table_name=table_name,
                         field_name=source_field,
@@ -498,19 +396,13 @@ class GenericDataContractValidator:
                     )
 
                 if max_length is not None:
-                    failed_count = (
-                        df
-                        .filter(
-                            F.col(actual_col).isNotNull()
-                            & (
-                                F.length(F.col(actual_col).cast("string"))
-                                > int(max_length)
-                            )
+                    failed_count = df.filter(
+                        F.col(actual_col).isNotNull()
+                        & (
+                            F.length(F.col(actual_col).cast("string"))
+                            > int(max_length)
                         )
-                        .count()
-                    )
-
-                    status = "passed" if failed_count == 0 else "failed"
+                    ).count()
 
                     self.add_result(
                         rule_id=safe_rule_id(
@@ -519,7 +411,7 @@ class GenericDataContractValidator:
                             source_field,
                         ),
                         rule_type="max_length",
-                        status=status,
+                        status="passed" if failed_count == 0 else "failed",
                         severity=severity,
                         table_name=table_name,
                         field_name=source_field,
@@ -532,12 +424,7 @@ class GenericDataContractValidator:
                     )
 
     def validate_allowed_values(self) -> None:
-        """
-        Validate allowed values defined in the YAML contract.
-        """
-        models = self.contract.get("models", {})
-
-        for model_name, model_config in models.items():
+        for model_name, model_config in self.contract.get("models", {}).items():
             table_name = model_config.get("physicalName")
             fields = model_config.get("fields", {})
 
@@ -557,28 +444,21 @@ class GenericDataContractValidator:
                 actual_col = self.get_actual_column_name(table_name, source_field)
                 severity = field_config.get("severity", "warning")
                 allowed_values_as_strings = [str(value) for value in allowed_values]
-
                 df = self.spark.table(table_name)
 
-                failed_count = (
-                    df
-                    .filter(
-                        F.col(actual_col).isNotNull()
-                        & (
-                            ~F.col(actual_col)
-                            .cast("string")
-                            .isin(allowed_values_as_strings)
-                        )
+                failed_count = df.filter(
+                    F.col(actual_col).isNotNull()
+                    & (
+                        ~F.col(actual_col)
+                        .cast("string")
+                        .isin(allowed_values_as_strings)
                     )
-                    .count()
-                )
-
-                status = "passed" if failed_count == 0 else "failed"
+                ).count()
 
                 self.add_result(
                     rule_id=safe_rule_id("ALLOWED_VALUES", model_name, source_field),
                     rule_type="allowed_values",
-                    status=status,
+                    status="passed" if failed_count == 0 else "failed",
                     severity=severity,
                     table_name=table_name,
                     field_name=source_field,
@@ -591,12 +471,7 @@ class GenericDataContractValidator:
                 )
 
     def validate_castability(self) -> None:
-        """
-        Validate fields that must be castable to a target datatype.
-        """
-        models = self.contract.get("models", {})
-
-        for model_name, model_config in models.items():
+        for model_name, model_config in self.contract.get("models", {}).items():
             table_name = model_config.get("physicalName")
             fields = model_config.get("fields", {})
 
@@ -615,26 +490,18 @@ class GenericDataContractValidator:
                     continue
 
                 actual_col = self.get_actual_column_name(table_name, source_field)
-
                 severity = field_config.get(
                     "severity",
                     format_config.get("severity", "error"),
                 )
-
                 df = self.spark.table(table_name)
 
-                failed_count = (
-                    df
-                    .filter(
-                        F.col(actual_col).isNotNull()
-                        & F.expr(
-                            f"try_cast({quote_col(actual_col)} as {castable_to})"
-                        ).isNull()
-                    )
-                    .count()
-                )
-
-                status = "passed" if failed_count == 0 else "failed"
+                failed_count = df.filter(
+                    F.col(actual_col).isNotNull()
+                    & F.expr(
+                        f"try_cast({quote_col(actual_col)} as {castable_to})"
+                    ).isNull()
+                ).count()
 
                 self.add_result(
                     rule_id=safe_rule_id(
@@ -644,7 +511,7 @@ class GenericDataContractValidator:
                         source_field,
                     ),
                     rule_type="castable_to_type",
-                    status=status,
+                    status="passed" if failed_count == 0 else "failed",
                     severity=severity,
                     table_name=table_name,
                     field_name=source_field,
@@ -657,9 +524,6 @@ class GenericDataContractValidator:
                 )
 
     def validate_reference_data_checks(self) -> None:
-        """
-        Validate required reference values.
-        """
         reference_checks = self.contract.get("referenceDataChecks", [])
 
         for check in reference_checks:
@@ -720,12 +584,11 @@ class GenericDataContractValidator:
             ]
 
             failed_count = len(missing_values)
-            status = "passed" if failed_count == 0 else "failed"
 
             self.add_result(
                 rule_id=rule_id,
                 rule_type="required_values_exist",
-                status=status,
+                status="passed" if failed_count == 0 else "failed",
                 severity=severity,
                 table_name=table_name,
                 field_name=field_name,
@@ -738,9 +601,6 @@ class GenericDataContractValidator:
             )
 
     def run_validations(self) -> DataFrame:
-        """
-        Run all validation checks and return a results DataFrame.
-        """
         self.validate_contract_definition()
         self.validate_table_existence()
         self.validate_field_existence()
@@ -768,9 +628,6 @@ class GenericDataContractValidator:
         return results_df
 
     def evaluate_quality_gate(self, results_df: DataFrame) -> Tuple[str, int, int]:
-        """
-        Evaluate whether the contract passed or failed.
-        """
         blocking_failures_df = results_df.filter(
             (F.col("status") == "failed")
             & (F.col("severity") == "error")
@@ -793,9 +650,6 @@ class GenericDataContractValidator:
         return "PASSED", blocking_failure_count, warning_failure_count
 
     def run(self) -> DataFrame:
-        """
-        Run validations, evaluate the quality gate, and fail the pipeline if needed.
-        """
         results_df = self.run_validations()
 
         status, blocking_failure_count, warning_failure_count = (
@@ -835,9 +689,6 @@ def run_contract_validation(
     fail_on_warning: bool = False,
     write_results: bool = True,
 ) -> DataFrame:
-    """
-    Public function used by Databricks runner scripts or notebooks.
-    """
     validator = GenericDataContractValidator(
         spark=spark,
         contract_file_path=contract_file_path,
