@@ -56,7 +56,7 @@ def normalise_path(path: str) -> str:
 
     Example:
         dbfs:/FileStore/contracts/file.yml
-        becomes
+        becomes:
         /dbfs/FileStore/contracts/file.yml
     """
     return path.replace("dbfs:/", "/dbfs/")
@@ -109,6 +109,7 @@ class GenericDataContractValidator:
 
         self.contract_id = self.contract.get("id", "unknown_contract")
         self.contract_version = str(self.contract.get("version", "unknown_version"))
+
         self.target_data_product = (
             self.contract
             .get("execution", {})
@@ -376,14 +377,15 @@ class GenericDataContractValidator:
         """
         models = self.contract.get("models", {})
 
-        for model_name, model_config in models.items():
+        for model_name, model_config in 
             table_name = model_config.get("physicalName")
             fields = model_config.get("fields", {})
 
             if not table_name or not self.table_exists(table_name):
                 continue
 
-            for logical_field_name, field_config in fields.          source_field = field_config.get("sourceField", logical_field_name)
+            for logical_field_name, field_config in fields.items():
+                source_field = field_config.get("sourceField", logical_field_name)
                 format_config = field_config.get("format", {})
                 regex = format_config.get("regex")
 
@@ -394,6 +396,7 @@ class GenericDataContractValidator:
                     continue
 
                 actual_col = self.get_actual_column_name(table_name, source_field)
+
                 severity = field_config.get(
                     "severity",
                     format_config.get("severity", "error"),
@@ -453,6 +456,7 @@ class GenericDataContractValidator:
                     continue
 
                 actual_col = self.get_actual_column_name(table_name, source_field)
+
                 severity = field_config.get(
                     "severity",
                     format_config.get("severity", "error"),
@@ -612,6 +616,7 @@ class GenericDataContractValidator:
                     continue
 
                 actual_col = self.get_actual_column_name(table_name, source_field)
+
                 severity = field_config.get(
                     "severity",
                     format_config.get("severity", "error"),
