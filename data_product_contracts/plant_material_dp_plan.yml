@@ -1,356 +1,161 @@
-dataContractSpecification: "1.1.0"
+contract:
+  name: material_plant_data_quality_contract
+  version: "1.0.0"
+  description: "Data quality contract for SAP bronze tables used by material plant data product"
+  owner: data-product-team
 
-id: "plant-material-data-quality-source-contract"
-name: "Plant Material Data Quality Source Contract"
-version: "1.0.0"
-status: "active"
+runtime:
+  parameters:
+    client: "100"
+    cutoff_date: "2025-10-01"
 
-description: >
-  Pre-transformation data contract for the Plant Material Data Quality data product.
-  This contract validates that all source tables and fields required by the transformation
-  SQL exist and conform to expected format rules before transformation logic is executed.
+sources:
+  - name: marc
+    table: workspace.sap_bronze.marc
+    checks:
+      - type: table_exists
+      - type: row_count_min
+        min: 1
+      - type: required_columns
+        columns:
+          - MANDT
+          - MATNR
+          - WERKS
+          - LVORM
+          - DISPO
+          - BESKZ
+          - EKGRP
+          - SHFLG
+          - SHZET
+          - DZEIT
+          - KORDB
+          - EISLO
+          - DISLS
+          - DISMM
+          - WEBAZ
+          - EISBE
+          - MTVFP
+          - FEVOR
+          - PLIFZ
+          - PRCTR
+          - MAABC
+      - type: not_null
+        columns:
+          - MANDT
+          - MATNR
+          - WERKS
+      - type: accepted_values
+        column: MANDT
+        values: ["${client}"]
+      - type: type_castable
+        columns:
+          - SHZET
+          - EISLO
+          - DISLS
+          - WEBAZ
+          - EISBE
+          - PLIFZ
+        target_type: double
 
-owner:
-  name: "Data Excellence Practice EMEA"
-  role: "Data Product Owner"
+  - name: mara
+    table: workspace.sap_bronze.mara
+    checks:
+      - type: table_exists
+      - type: row_count_min
+        min: 1
+      - type: required_columns
+        columns:
+          - MANDT
+          - MATNR
+          - MTART
+      - type: not_null
+        columns:
+          - MANDT
+          - MATNR
+          - MTART
+      - type: accepted_values
+        column: MANDT
+        values: ["${client}"]
 
-execution:
-  validationStage: "pre-transformation"
-  failureAction: "stop_pipeline"
-  successAction: "run_transformation"
-  targetDataProduct: "default.MATERIAL_PLANT_DATA_QUALITY_CHECK"
+  - name: ekpo
+    table: workspace.sap_bronze.ekpo
+    checks:
+      - type: table_exists
+      - type: required_columns
+        columns:
+          - MATNR
+          - AEDAT
+      - type: type_castable
+        columns:
+          - AEDAT
+        target_type: date
+      - type: freshness
+        column: AEDAT
+        cutoff_date: "${cutoff_date}"
+        severity: warning
 
-servers:
-  source:
-    type: "databricks"
-    environment: "production"
-    catalog: "workspace"
-    schemas:
-      - "sap_bronze"
-      - "default"
+  - name: vbap
+    table: workspace.sap_bronze.vbap
+    checks:
+      - type: table_exists
+      - type: required_columns
+        columns:
+          - MATNR
+          - ERDAT
+      - type: type_castable
+        columns:
+          - ERDAT
+        target_type: date
+      - type: freshness
+        column: ERDAT
+        cutoff_date: "${cutoff_date}"
+        severity: warning
 
-dataProduct:
-  name: "Plant Material Data Quality Check"
-  targetTable: "default.MATERIAL_PLANT_DATA_QUALITY_CHECK"
-  sourceSystem: "SAP"
-  domain: "Material Master Data"
-  subjectArea: "Plant Material Data Quality"
+  - name: dq_rules_master
+    table: workspace.default.dq_rules_master
+    checks:
+      - type: table_exists
+      - type: row_count_min
+        min: 1
+      - type: required_columns
+        columns:
+          - RULE_NAME
+          - FUNCTION
+          - TYPE
+      - type: not_null
+        columns:
+          - RULE_NAME
+          - FUNCTION
+          - TYPE
+      - type: accepted_values
+        column: RULE_NAME
+        values:
+          - MRP_CONTROLLER_COMPLETENESS_CHECK
+          - PURCHASE_GROUP_COMPLETENESS_CHECK
+          - SAFETY_TIME_COMPLETENESS_CHECK
+          - INHOUSE_PRODUCTION_LEADTIME_COMPLETENESS_CHECK
+          - SOURCE_LIST_REQUIREMENT_COMPLETENESS_CHECK
+          - MIN_SAFETY_STOCK_COMPLETENESS_CHECK
+          - LOT_SIZE_COMPLETENESS_CHECK
+          - MRP_TYPE_COMPLETENESS_CHECK
+          - GR_PROCESSTIME_COMPLETENESS_CHECK
+          - SAFETY_STOCK_COMPLETENESS_CHECK
+          - ATP_COMPLETENESS_CHECK
+          - INHOUSE_PRODUCTION_SCHEDULER_COMPLETENESS_CHECK
+          - DELIVERY_LEADTIME_COMPLETENESS_CHECK
+          - PROFIT_CENTER_COMPLETENESS_CHECK
+          - ABC_COMPLETENESS_CHECK
+          - PROCUREMENT_MATERIAL_STALENESS_CHECK
+          - SALES_MATERIAL_STALENESS_CHECK
 
-models:
-
-  marc:
-    description: "SAP Material Master - Plant Data"
-    type: "table"
-    physicalName: "workspace.sap_bronze.marc"
-    required: true
-
-    fields:
-
-      mandt:
-        sourceField: "MANDT"
-        description: "SAP Client"
-        required: true
-        nullable: false
-        type: "string"
-        format:
-          length: 3
-          regex: "^[0-9]{3}$"
-
-      werks:
-        sourceField: "WERKS"
-        description: "Plant"
-        required: true
-        nullable: false
-        type: "string"
-        format:
-          maxLength: 4
-          regex: "^[A-Z0-9]{1,4}$"
-
-      matnr:
-        sourceField: "MATNR"
-        description: "Material Number"
-        required: true
-        nullable: false
-        type: "string"
-        format:
-          maxLength: 40
-          regex: "^[A-Z0-9_\\-]+$"
-
-      dispo:
-        sourceField: "DISPO"
-        description: "MRP Controller"
-        required: true
-        nullable: true
-        type: "string"
-        format:
-          maxLength: 3
-
-      beskz:
-        sourceField: "BESKZ"
-        description: "Procurement Type"
-        required: true
-        nullable: true
-        type: "string"
-        severity: "warning"
-        format:
-          maxLength: 1
-        allowedValues:
-          - "E"
-          - "F"
-          - "X"
-
-      ekgrp:
-        sourceField: "EKGRP"
-        description: "Purchasing Group"
-        required: true
-        nullable: true
-        type: "string"
-        format:
-          maxLength: 3
-
-      shflg:
-        sourceField: "SHFLG"
-        description: "Safety Time Indicator"
-        required: true
-        nullable: true
-        type: "string"
-        format:
-          maxLength: 1
-
-      shzet:
-        sourceField: "SHZET"
-        description: "Safety Time"
-        required: true
-        nullable: true
-        type: "numeric_string"
-        format:
-          castableTo: "double"
-
-      dzeit:
-        sourceField: "DZEIT"
-        description: "In-house Production Time"
-        required: true
-        nullable: true
-        type: "numeric_string"
-        format:
-          castableTo: "double"
-
-      kordb:
-        sourceField: "KORDB"
-        description: "Source List Requirement Indicator"
-        required: true
-        nullable: true
-        type: "string"
-        severity: "warning"
-        format:
-          maxLength: 1
-        allowedValues:
-          - "X"
-
-      eislo:
-        sourceField: "EISLO"
-        description: "Minimum Safety Stock"
-        required: true
-        nullable: true
-        type: "numeric_string"
-        format:
-          castableTo: "double"
-
-      disls:
-        sourceField: "DISLS"
-        description: "Lot Sizing Procedure"
-        required: true
-        nullable: true
-        type: "string"
-        format:
-          maxLength: 2
-
-      dismm:
-        sourceField: "DISMM"
-        description: "MRP Type"
-        required: true
-        nullable: true
-        type: "string"
-        format:
-          maxLength: 2
-
-      webaz:
-        sourceField: "WEBAZ"
-        description: "Goods Receipt Processing Time"
-        required: true
-        nullable: true
-        type: "numeric_string"
-        format:
-          castableTo: "double"
-
-      eisbe:
-        sourceField: "EISBE"
-        description: "Safety Stock"
-        required: true
-        nullable: true
-        type: "numeric_string"
-        format:
-          castableTo: "double"
-
-      mtvfp:
-        sourceField: "MTVFP"
-        description: "Checking Group for Availability Check"
-        required: true
-        nullable: true
-        type: "string"
-        format:
-          maxLength: 2
-
-      fevor:
-        sourceField: "FEVOR"
-        description: "Production Scheduler"
-        required: true
-        nullable: true
-        type: "string"
-        format:
-          maxLength: 3
-
-      plifz:
-        sourceField: "PLIFZ"
-        description: "Planned Delivery Time"
-        required: true
-        nullable: true
-        type: "numeric_string"
-        format:
-          castableTo: "double"
-
-      prctr:
-        sourceField: "PRCTR"
-        description: "Profit Center"
-        required: true
-        nullable: true
-        type: "string"
-        format:
-          maxLength: 10
-
-      maabc:
-        sourceField: "MAABC"
-        description: "ABC Indicator"
-        required: true
-        nullable: true
-        type: "string"
-        format:
-          maxLength: 1
-
-      lvorm:
-        sourceField: "LVORM"
-        description: "Deletion Indicator"
-        required: true
-        nullable: true
-        type: "string"
-        severity: "warning"
-        format:
-          maxLength: 1
-        allowedValues:
-          - "X"
-
-  mara:
-    description: "SAP Material Master - General Material Data"
-    type: "table"
-    physicalName: "workspace.sap_bronze.mara"
-    required: true
-
-    fields:
-
-      mandt:
-        sourceField: "MANDT"
-        description: "SAP Client"
-        required: true
-        nullable: false
-        type: "string"
-        format:
-          length: 3
-          regex: "^[0-9]{3}$"
-
-      matnr:
-        sourceField: "MATNR"
-        description: "Material Number"
-        required: true
-        nullable: false
-        type: "string"
-        format:
-          maxLength: 40
-          regex: "^[A-Z0-9_\\-]+$"
-
-      mtart:
-        sourceField: "MTART"
-        description: "Material Type"
-        required: true
-        nullable: true
-        type: "string"
-        format:
-          maxLength: 4
-        expectedValuesUsedInLogic:
-          - "FERT"
-          - "HALB"
-          - "HAWA"
-
-  ekpo:
-    description: "SAP Purchasing Document Item"
-    type: "table"
-    physicalName: "workspace.sap_bronze.ekpo"
-    required: true
-
-    fields:
-
-      matnr:
-        sourceField: "MATNR"
-        description: "Material Number"
-        required: true
-        nullable: true
-        type: "string"
-        format:
-          maxLength: 40
-          regex: "^[A-Z0-9_\\-]+$"
-
-      aedat:
-        sourceField: "AEDAT"
-        description: "Purchasing Document Date"
-        required: true
-        nullable: true
-        type: "date_string"
-        format:
-          castableTo: "date"
-
-  vbap:
-    description: "SAP Sales Document Item"
-    type: "table"
-    physicalName: "workspace.sap_bronze.vbap"
-    required: true
-
-    fields:
-
-      matnr:
-        sourceField: "MATNR"
-        description: "Material Number"
-        required: true
-        nullable: true
-        type: "string"
-        format:
-          maxLength: 40
-          regex: "^[A-Z0-9_\\-]+$"
-
-      erdat:
-        sourceField: "ERDAT"
-        description: "Sales Document Creation Date"
-        required: true
-        nullable: true
-        type: "date_string"
-        format:
-          castableTo: "date"
-
-  dq_rules_master:
-    description: "Data Quality Rules Master"
-    type: "table"
-    physicalName: "workspace.default.dq_rules_master"
-    required: true
-
-    fields:
-
-      rule_name:
-        sourceField: "RULE_NAME"
+cross_source_checks:
+  - name: marc_mara_join_coverage
+    type: referential_integrity
+    left_table: workspace.sap_bronze.marc
+    right_table: workspace.sap_bronze.mara
+    join_columns:
+      - MANDT
+      - MATNR
+    left_filter: "MANDT = '${client}' AND LVORM IS NULL"
+    max_orphan_count: 0
+    severity: error
