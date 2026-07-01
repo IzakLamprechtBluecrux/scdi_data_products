@@ -377,7 +377,7 @@ class GenericDataContractValidator:
         """
         models = self.contract.get("models", {})
 
-        for model_name, model_config in 
+        for model_name, model_config in models.items():
             table_name = model_config.get("physicalName")
             fields = model_config.get("fields", {})
 
@@ -406,8 +406,7 @@ class GenericDataContractValidator:
 
                 failed_count = (
                     df
-                    .filter(
-                        F.col(actual_col).isNotNull()
+                    .filter           F.col(actual_col).isNotNull()
                         & (~F.col(actual_col).cast("string").rlike(regex))
                     )
                     .count()
